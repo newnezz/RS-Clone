@@ -3,6 +3,7 @@ import {
   getSupabaseClient,
   isSupabaseConfigured,
   resolveAuthUser,
+  syncRealtimeAuth,
   validateEmail,
   validatePassword,
   validateUsername,
@@ -30,12 +31,14 @@ export class AuthService {
     const { data } = await supabase.auth.getSession();
     if (data.session?.user) {
       this.user = await this.userFromSession(data.session);
+      await syncRealtimeAuth();
     }
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (_event: AuthChangeEvent, session: Session | null) => {
         if (session?.user) {
           this.user = await this.userFromSession(session);
+          await syncRealtimeAuth();
         } else {
           this.user = null;
         }

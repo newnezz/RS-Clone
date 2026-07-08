@@ -60,6 +60,8 @@ export class ChatPanel {
       const result = await this.onSend(text);
       if (!result.error) {
         this.input.value = '';
+      } else {
+        this.addSystemMessage(result.error);
       }
     });
 

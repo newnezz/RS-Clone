@@ -1,4 +1,4 @@
-import type { RealtimeChannel } from '@supabase/supabase-js';
+import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseClient } from '../auth/supabaseClient';
 import type { PlayerSession } from '../auth/types';
 import {
@@ -10,6 +10,11 @@ import {
 
 type PresenceListener = (players: PlayerPresence[]) => void;
 type ChatListener = (message: ChatMessage) => void;
+
+interface ConnectOptions {
+  x: number;
+  y: number;
+}
 
 export class RealtimeService {
   private channel: RealtimeChannel | null = null;
@@ -35,7 +40,7 @@ export class RealtimeService {
     this.chatListener = listener;
   }
 
-  async connect(): Promise<{ error: string | null }> {
+  async connect(options: ConnectOptions): Promise<{ error: string | null }> {
     if (this.session.mode !== 'online') {
       return { error: null };
     }
@@ -50,53 +55,31 @@ export class RealtimeService {
       return { error: 'Not authenticated for multiplayer. Try signing out and back in.' };
     }
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.access_token) {
-        void supabase.realtime.setAuth(session.access_token);
-      }
+    this.bindAuthListener(supabase);
+
+    let result = await this.subscribeToChannel(supabase, true, options);
+    if (result.error) {
+      result = await this.subscribeToChannel(supabase, false, options);
+    }
+
+    if (result.error) {
+      return result;
+    }
+
+    const trackResult = await this.channel!.track({
+      userId: this.session.userId,
+      username: this.session.username,
+      x: Math.round(options.x),
+      y: Math.round(options.y),
+      updatedAt: Date.now(),
     });
-    this.authUnsubscribe = () => authListener.subscription.unsubscribe();
 
-    this.channel = supabase.channel(WORLD_CHANNEL, {
-      config: {
-        presence: { key: this.session.userId },
-        private: true,
-      },
-    });
+    if (trackResult !== 'ok') {
+      return { error: 'Connected but failed to announce your presence.' };
+    }
 
-    this.channel
-      .on('presence', { event: 'sync' }, () => this.emitPresence())
-      .on('presence', { event: 'join' }, () => this.emitPresence())
-      .on('presence', { event: 'leave' }, () => this.emitPresence())
-      .on('broadcast', { event: 'chat' }, ({ payload }) => {
-        const message = payload as ChatMessage;
-        if (message?.text && message.username) {
-          this.chatListener?.(message);
-        }
-      });
-
-    return new Promise((resolve) => {
-      this.channel!.subscribe(async (status, err) => {
-        if (status === 'SUBSCRIBED') {
-          this.connected = true;
-          await this.channel?.track({
-            userId: this.session.userId,
-            username: this.session.username,
-            x: 0,
-            y: 0,
-            updatedAt: Date.now(),
-          });
-          this.emitPresence();
-          resolve({ error: null });
-          return;
-        }
-
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          const detail = err?.message ? `: ${err.message}` : '';
-          resolve({ error: `Could not connect to world (${status}${detail}).` });
-        }
-      });
-    });
+    this.emitPresence();
+    return { error: null };
   }
 
   async updatePresence(x: number, y: number): Promise<void> {
@@ -138,7 +121,7 @@ export class RealtimeService {
     });
 
     if (status !== 'ok') {
-      return { error: 'Failed to send message.', message: null };
+      return { error: 'Failed to send message. Check your connection.', message: null };
     }
 
     return { error: null, message };
@@ -148,25 +131,129 @@ export class RealtimeService {
     this.authUnsubscribe?.();
     this.authUnsubscribe = null;
 
+    const supabase = getSupabaseClient();
     if (this.channel) {
       await this.channel.untrack();
       await this.channel.unsubscribe();
+      supabase?.removeChannel(this.channel);
       this.channel = null;
     }
+    this.connected = false;
+  }
+
+  private bindAuthListener(supabase: SupabaseClient): void {
+    this.authUnsubscribe?.();
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.access_token) {
+        void supabase.realtime.setAuth(session.access_token);
+      }
+    });
+    this.authUnsubscribe = () => authListener.subscription.unsubscribe();
+  }
+
+  private async subscribeToChannel(
+    supabase: SupabaseClient,
+    isPrivate: boolean,
+    _options: ConnectOptions,
+  ): Promise<{ error: string | null }> {
+    await this.teardownChannel(supabase);
+
+    this.channel = supabase.channel(WORLD_CHANNEL, {
+      config: {
+        presence: { key: this.session.userId },
+        private: isPrivate,
+        broadcast: { self: false },
+      },
+    });
+
+    this.channel
+      .on('presence', { event: 'sync' }, () => this.emitPresence())
+      .on('presence', { event: 'join' }, () => this.emitPresence())
+      .on('presence', { event: 'leave' }, () => this.emitPresence())
+      .on('broadcast', { event: 'chat' }, (envelope) => {
+        const message = this.parseChatEnvelope(envelope);
+        if (message) {
+          this.chatListener?.(message);
+        }
+      });
+
+    return this.waitForSubscribe(isPrivate);
+  }
+
+  private waitForSubscribe(isPrivate: boolean): Promise<{ error: string | null }> {
+    return new Promise((resolve) => {
+      const timeout = window.setTimeout(() => {
+        resolve({
+          error: `Connection timed out (${isPrivate ? 'private' : 'public'} channel).`,
+        });
+      }, 12_000);
+
+      this.channel!.subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          window.clearTimeout(timeout);
+          this.connected = true;
+          resolve({ error: null });
+          return;
+        }
+
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          window.clearTimeout(timeout);
+          const detail = err?.message ? `: ${err.message}` : '';
+          resolve({
+            error: `Could not connect (${isPrivate ? 'private' : 'public'}${detail}).`,
+          });
+        }
+      });
+    });
+  }
+
+  private async teardownChannel(supabase: SupabaseClient): Promise<void> {
+    if (!this.channel) {
+      return;
+    }
+
+    await this.channel.unsubscribe();
+    supabase.removeChannel(this.channel);
+    this.channel = null;
     this.connected = false;
   }
 
   private async ensureRealtimeAuth(
     supabase: NonNullable<ReturnType<typeof getSupabaseClient>>,
   ): Promise<boolean> {
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
+    const refreshed = await supabase.auth.refreshSession();
+    const token =
+      refreshed.data.session?.access_token ??
+      (await supabase.auth.getSession()).data.session?.access_token;
+
     if (!token) {
       return false;
     }
 
     await supabase.realtime.setAuth(token);
     return true;
+  }
+
+  private parseChatEnvelope(envelope: Record<string, unknown>): ChatMessage | null {
+    const nested = envelope.payload;
+    const candidate =
+      nested && typeof nested === 'object' ? (nested as Record<string, unknown>) : envelope;
+
+    if (
+      typeof candidate.text !== 'string' ||
+      typeof candidate.username !== 'string' ||
+      typeof candidate.userId !== 'string'
+    ) {
+      return null;
+    }
+
+    return {
+      id: typeof candidate.id === 'string' ? candidate.id : crypto.randomUUID(),
+      userId: candidate.userId,
+      username: candidate.username,
+      text: candidate.text,
+      timestamp: typeof candidate.timestamp === 'number' ? candidate.timestamp : Date.now(),
+    };
   }
 
   private emitPresence(): void {

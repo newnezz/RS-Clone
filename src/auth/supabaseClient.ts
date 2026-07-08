@@ -16,10 +16,32 @@ export function getSupabaseClient(): SupabaseClient | null {
     client = createClient(
       import.meta.env.VITE_SUPABASE_URL,
       import.meta.env.VITE_SUPABASE_ANON_KEY,
+      {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+        },
+      },
     );
   }
 
   return client;
+}
+
+export async function syncRealtimeAuth(): Promise<boolean> {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return false;
+  }
+
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) {
+    return false;
+  }
+
+  await supabase.realtime.setAuth(token);
+  return true;
 }
 
 async function fetchProfile(supabase: SupabaseClient, userId: string): Promise<string | null> {

@@ -30,6 +30,7 @@ export class GameScene extends Phaser.Scene {
   private hud!: Hud;
   private worldPointerInput!: WorldPointerInput;
   private session!: PlayerSession;
+  private spawn = DEFAULT_SPAWN;
   private realtime: RealtimeService | null = null;
   private remotePlayers: RemotePlayerManager | null = null;
   private chatPanel: ChatPanel | null = null;
@@ -57,6 +58,7 @@ export class GameScene extends Phaser.Scene {
     const spawn = this.session.mode === 'online'
       ? getSpawnPosition(this.session.userId)
       : DEFAULT_SPAWN;
+    this.spawn = spawn;
     const player = createPlayer(entityManager, spawn.x, spawn.y);
     const gameState = createGameState(player.id);
 
@@ -112,6 +114,9 @@ export class GameScene extends Phaser.Scene {
       const result = await this.realtime.sendChat(text);
       if (result.message) {
         this.chatPanel?.addMessage(result.message);
+      }
+      if (result.error) {
+        this.chatPanel?.addSystemMessage(result.error);
       }
       return { error: result.error };
     });
@@ -169,11 +174,19 @@ export class GameScene extends Phaser.Scene {
       }
     });
 
-    const result = await this.realtime.connect();
+    const result = await this.realtime.connect({
+      x: this.spawn.x,
+      y: this.spawn.y,
+    });
     if (result.error) {
       this.chatPanel?.addSystemMessage(`Multiplayer: ${result.error}`);
+      this.chatPanel?.addSystemMessage('Run supabase/migrations/002_realtime_policies.sql in Supabase SQL Editor.');
     } else {
-      this.chatPanel?.addSystemMessage('Connected to world. Other players may appear nearby.');
+      this.chatPanel?.addSystemMessage('Connected to world. Other players appear as blue characters.');
+      const position = this.gameWorld.context.getPlayerPosition();
+      if (position) {
+        await this.realtime.updatePresence(position.x, position.y);
+      }
     }
   }
 
