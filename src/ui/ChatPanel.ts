@@ -1,0 +1,96 @@
+import type { PlayerSession } from '../auth/types';
+import type { ChatMessage } from '../network/types';
+
+export class ChatPanel {
+  private readonly root: HTMLElement;
+  private readonly messagesEl: HTMLElement;
+  private readonly form: HTMLFormElement;
+  private readonly input: HTMLInputElement;
+  private readonly onSend: (text: string) => Promise<{ error: string | null }>;
+  private open = true;
+
+  constructor(session: PlayerSession, onSend: (text: string) => Promise<{ error: string | null }>) {
+    this.onSend = onSend;
+    const element = document.getElementById('chat-root');
+    if (!element) {
+      throw new Error('Missing #chat-root element');
+    }
+    this.root = element;
+
+    this.root.innerHTML = `
+      <div class="chat-panel ${session.mode === 'offline' ? 'chat-disabled' : ''}">
+        <div class="chat-header">
+          <span>World Chat</span>
+          <button type="button" id="chat-toggle" aria-label="Toggle chat">−</button>
+        </div>
+        <div id="chat-messages" class="chat-messages"></div>
+        <form id="chat-form" class="chat-form">
+          <input id="chat-input" type="text" maxlength="200" placeholder="${session.mode === 'offline' ? 'Chat requires online login' : 'Type a message…'}" ${session.mode === 'offline' ? 'disabled' : ''} />
+          <button type="submit" ${session.mode === 'offline' ? 'disabled' : ''}>Send</button>
+        </form>
+      </div>
+    `;
+
+    this.messagesEl = this.root.querySelector('#chat-messages') as HTMLElement;
+    this.form = this.root.querySelector('#chat-form') as HTMLFormElement;
+    this.input = this.root.querySelector('#chat-input') as HTMLInputElement;
+
+    this.root.querySelector('#chat-toggle')?.addEventListener('click', () => {
+      this.open = !this.open;
+      this.root.querySelector('.chat-panel')?.classList.toggle('chat-collapsed', !this.open);
+      const toggle = this.root.querySelector('#chat-toggle');
+      if (toggle) {
+        toggle.textContent = this.open ? '−' : '+';
+      }
+    });
+
+    this.form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const text = this.input.value;
+      if (!text.trim()) {
+        return;
+      }
+
+      const result = await this.onSend(text);
+      if (!result.error) {
+        this.input.value = '';
+      }
+    });
+
+    if (session.mode === 'online') {
+      this.addSystemMessage(`Logged in as ${session.username}. Say hello!`);
+    }
+  }
+
+  addMessage(message: ChatMessage): void {
+    const line = document.createElement('div');
+    line.className = 'chat-line';
+    line.innerHTML = `<strong>${escapeHtml(message.username)}:</strong> ${escapeHtml(message.text)}`;
+    this.messagesEl.appendChild(line);
+    this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+
+    while (this.messagesEl.children.length > 50) {
+      this.messagesEl.firstChild?.remove();
+    }
+  }
+
+  addSystemMessage(text: string): void {
+    const line = document.createElement('div');
+    line.className = 'chat-line chat-system';
+    line.textContent = text;
+    this.messagesEl.appendChild(line);
+    this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+  }
+
+  destroy(): void {
+    this.root.innerHTML = '';
+  }
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+}
