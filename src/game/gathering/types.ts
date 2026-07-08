@@ -48,3 +48,7 @@ export function getGatheringConfigForAction(
   }
   return config;
 }
+
+export function getAutoGatherAction(objectType: string): InteractionAction | null {
+  return getGatheringConfig(objectType)?.action ?? null;
+}

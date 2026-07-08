@@ -27,20 +27,19 @@ import { PRESENCE_SYNC_INTERVAL_MS } from '../../network/types';
 import { KeyboardInput } from '../../ui/KeyboardInput';
 import { TouchControls } from '../../ui/TouchControls';
 import { WorldPointerInput } from '../../ui/WorldPointerInput';
-import { ActionPanel, InteractionHighlight } from '../../ui/InteractionUI';
 import { ChatPanel } from '../../ui/ChatPanel';
-import { Hud, InventoryPanel, QuestLog } from '../../ui/Hud';
+import { GatheringProgressBar } from '../../ui/GatheringProgressBar';
+import { Hud, InventoryPanel } from '../../ui/Hud';
+import { initUiLayout } from '../../ui/UiLayout';
 
 export class GameScene extends Phaser.Scene {
   private gameWorld!: GameWorld;
   private inputManager!: InputManager;
   private hud!: Hud;
   private inventoryPanel!: InventoryPanel;
-  private questLog!: QuestLog;
   private touchControls!: TouchControls;
   private worldPointerInput!: WorldPointerInput;
-  private interactionHighlight!: InteractionHighlight;
-  private actionPanel!: ActionPanel;
+  private gatheringProgressBar!: GatheringProgressBar;
   private gatherableVisuals!: GatherableVisuals;
   private session!: PlayerSession;
   private realtime: RealtimeService | null = null;
@@ -86,16 +85,10 @@ export class GameScene extends Phaser.Scene {
 
     this.gameWorld = new GameWorld(context, this);
 
+    initUiLayout();
+
     this.touchControls = new TouchControls(this, deviceProfile);
-    this.actionPanel = new ActionPanel(this, deviceProfile, (action) => {
-      this.gameWorld.requestAction(action);
-    });
-    this.worldPointerInput = new WorldPointerInput(
-      this,
-      deviceProfile,
-      this.touchControls,
-      this.actionPanel,
-    );
+    this.worldPointerInput = new WorldPointerInput(this, deviceProfile, this.touchControls);
 
     const keyboardInput = new KeyboardInput(this);
     this.inputManager = new InputManager([
@@ -104,12 +97,11 @@ export class GameScene extends Phaser.Scene {
       keyboardInput,
     ]);
 
-    this.interactionHighlight = new InteractionHighlight(this);
+    this.gatheringProgressBar = new GatheringProgressBar(this);
     this.hud = new Hud(this, deviceProfile, this.session, () => {
       void this.handleSignOut();
     });
     this.inventoryPanel = new InventoryPanel(this, deviceProfile);
-    this.questLog = new QuestLog(this, deviceProfile);
 
     this.chatPanel = new ChatPanel(this.session, async (text) => {
       if (!this.realtime) {
@@ -132,11 +124,9 @@ export class GameScene extends Phaser.Scene {
   update(time: number, delta: number): void {
     this.gameWorld.context.inputState = this.inputManager.poll();
     this.gameWorld.update(delta);
-    this.interactionHighlight.update(this.gameWorld.context);
-    this.actionPanel.update(this.gameWorld.context);
+    this.gatheringProgressBar.update(this.gameWorld.context);
     this.hud.update(this.gameWorld.context);
     this.inventoryPanel.update(this.gameWorld.context);
-    this.questLog.update(this.gameWorld.context);
 
     if (this.realtime?.isConnected && this.remotePlayers) {
       if (time - this.lastPresenceSync >= PRESENCE_SYNC_INTERVAL_MS) {
@@ -188,12 +178,10 @@ export class GameScene extends Phaser.Scene {
     this.gameWorld.destroy();
     this.touchControls.destroy();
     this.worldPointerInput.destroy();
-    this.interactionHighlight.destroy();
-    this.actionPanel.destroy();
+    this.gatheringProgressBar.destroy();
     this.gatherableVisuals.destroy();
     this.hud.destroy();
     this.inventoryPanel.destroy();
-    this.questLog.destroy();
     this.remotePlayers?.destroy();
     this.chatPanel?.destroy();
   }

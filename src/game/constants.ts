@@ -4,3 +4,6 @@ export const WORLD_HEIGHT = 36;
 export const PLAYER_SPEED = 120;
 export const PLAYER_RADIUS = 10;
 export const APPROACH_ARRIVAL_DISTANCE = 6;
+export const GATHER_DURATION_MS = 3000;
+export const DOUBLE_TAP_WINDOW_MS = 400;
+export const DOUBLE_TAP_MAX_DISTANCE = 28;

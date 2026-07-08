@@ -2,11 +2,7 @@ import type { GameContext } from '../core/GameContext';
 import { GameEvents } from '../core/EventBus';
 import { APPROACH_ARRIVAL_DISTANCE, PLAYER_SPEED } from '../constants';
 import { normalizeInputVector } from '../input/types';
-import {
-  hasManualMovement,
-  isPlayerInInteractionRange,
-} from '../interaction/interactionUtils';
-import { setInteractionMessage } from '../interaction/InteractionState';
+import { hasManualMovement } from '../interaction/interactionUtils';
 import type { GameSystem } from './SystemPipeline';
 
 export class InputSystem implements GameSystem {
@@ -20,6 +16,12 @@ export class InputSystem implements GameSystem {
 
     const velocity = player.components.velocity;
     const interaction = context.interactionState;
+
+    if (interaction.gathering) {
+      velocity.vx = 0;
+      velocity.vy = 0;
+      return;
+    }
 
     if (hasManualMovement(context.inputState.movement)) {
       const direction = normalizeInputVector(context.inputState.movement);
@@ -43,19 +45,6 @@ export class InputSystem implements GameSystem {
           velocity.vx = 0;
           velocity.vy = 0;
           interaction.approachTile = null;
-
-          if (
-            isPlayerInInteractionRange(
-              playerPosition.x,
-              playerPosition.y,
-              interaction.selectedTarget,
-            )
-          ) {
-            setInteractionMessage(
-              interaction,
-              `Reached ${interaction.selectedTarget.label}. Choose an action.`,
-            );
-          }
           return;
         }
 

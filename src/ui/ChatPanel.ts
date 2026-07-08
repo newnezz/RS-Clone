@@ -1,5 +1,13 @@
 import type { PlayerSession } from '../auth/types';
 import type { ChatMessage } from '../network/types';
+import { initUiLayout } from './UiLayout';
+
+function isTouchDevice(): boolean {
+  return (
+    window.matchMedia('(pointer: coarse)').matches ||
+    (navigator.maxTouchPoints ?? 0) > 0
+  );
+}
 
 export class ChatPanel {
   private readonly root: HTMLElement;
@@ -7,10 +15,12 @@ export class ChatPanel {
   private readonly form: HTMLFormElement;
   private readonly input: HTMLInputElement;
   private readonly onSend: (text: string) => Promise<{ error: string | null }>;
-  private open = true;
+  private open: boolean;
 
   constructor(session: PlayerSession, onSend: (text: string) => Promise<{ error: string | null }>) {
     this.onSend = onSend;
+    this.open = !isTouchDevice();
+
     const element = document.getElementById('chat-root');
     if (!element) {
       throw new Error('Missing #chat-root element');
@@ -18,10 +28,10 @@ export class ChatPanel {
     this.root = element;
 
     this.root.innerHTML = `
-      <div class="chat-panel ${session.mode === 'offline' ? 'chat-disabled' : ''}">
+      <div class="chat-panel ${session.mode === 'offline' ? 'chat-disabled' : ''} ${this.open ? '' : 'chat-collapsed'}">
         <div class="chat-header">
           <span>World Chat</span>
-          <button type="button" id="chat-toggle" aria-label="Toggle chat">−</button>
+          <button type="button" id="chat-toggle" aria-label="Toggle chat">${this.open ? '−' : '+'}</button>
         </div>
         <div id="chat-messages" class="chat-messages"></div>
         <form id="chat-form" class="chat-form">
@@ -42,6 +52,7 @@ export class ChatPanel {
       if (toggle) {
         toggle.textContent = this.open ? '−' : '+';
       }
+      initUiLayout();
     });
 
     this.form.addEventListener('submit', async (event) => {
@@ -56,6 +67,8 @@ export class ChatPanel {
         this.input.value = '';
       }
     });
+
+    initUiLayout();
 
     if (session.mode === 'online') {
       this.addSystemMessage(`Logged in as ${session.username}. Say hello!`);

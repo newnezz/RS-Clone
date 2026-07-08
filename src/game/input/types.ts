@@ -12,6 +12,7 @@ export interface InputState {
   movement: InputVector;
   pointer: WorldPointer | null;
   selectPressed: boolean;
+  doubleSelectPressed: boolean;
   interactPressed: boolean;
 }
 
@@ -20,6 +21,7 @@ export function createInputState(overrides?: Partial<InputState>): InputState {
     movement: { x: 0, y: 0, ...overrides?.movement },
     pointer: overrides?.pointer ?? null,
     selectPressed: overrides?.selectPressed ?? false,
+    doubleSelectPressed: overrides?.doubleSelectPressed ?? false,
     interactPressed: overrides?.interactPressed ?? false,
   };
 }
@@ -50,6 +52,7 @@ export function mergeInputStates(states: InputState[]): InputState {
       merged.pointer = state.pointer;
     }
     merged.selectPressed = merged.selectPressed || state.selectPressed;
+    merged.doubleSelectPressed = merged.doubleSelectPressed || state.doubleSelectPressed;
     merged.interactPressed = merged.interactPressed || state.interactPressed;
   }
 

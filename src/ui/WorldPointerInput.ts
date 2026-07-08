@@ -2,8 +2,8 @@ import Phaser from 'phaser';
 import { createInputState, type InputState } from '../game/input/types';
 import type { InputProvider } from '../game/input/InputProvider';
 import type { DeviceProfile } from '../game/platform/DeviceProfile';
+import { DOUBLE_TAP_MAX_DISTANCE, DOUBLE_TAP_WINDOW_MS } from '../game/constants';
 import type { TouchControls } from './TouchControls';
-import type { ActionPanel } from './InteractionUI';
 
 export class WorldPointerInput implements InputProvider {
   readonly id = 'pointer';
@@ -12,20 +12,15 @@ export class WorldPointerInput implements InputProvider {
   private readonly scene: Phaser.Scene;
   private readonly deviceProfile: DeviceProfile;
   private readonly touchControls: TouchControls;
-  private readonly actionPanel: ActionPanel;
   private pointerWorld: { worldX: number; worldY: number } | null = null;
-  private selectPressed = false;
+  private doubleSelectPressed = false;
+  private lastTapTime = 0;
+  private lastTapWorld: { worldX: number; worldY: number } | null = null;
 
-  constructor(
-    scene: Phaser.Scene,
-    deviceProfile: DeviceProfile,
-    touchControls: TouchControls,
-    actionPanel: ActionPanel,
-  ) {
+  constructor(scene: Phaser.Scene, deviceProfile: DeviceProfile, touchControls: TouchControls) {
     this.scene = scene;
     this.deviceProfile = deviceProfile;
     this.touchControls = touchControls;
-    this.actionPanel = actionPanel;
 
     scene.input.on('pointermove', this.onPointerMove, this);
     scene.input.on('pointerdown', this.onPointerDown, this);
@@ -34,9 +29,9 @@ export class WorldPointerInput implements InputProvider {
   poll(): InputState {
     const state = createInputState({
       pointer: this.pointerWorld,
-      selectPressed: this.selectPressed,
+      doubleSelectPressed: this.doubleSelectPressed,
     });
-    this.selectPressed = false;
+    this.doubleSelectPressed = false;
     return state;
   }
 
@@ -58,10 +53,6 @@ export class WorldPointerInput implements InputProvider {
       return;
     }
 
-    if (this.actionPanel.containsScreenPoint(pointer.x, pointer.y)) {
-      return;
-    }
-
     if (
       this.deviceProfile.isTouchPrimary &&
       this.touchControls.isInJoystickZone(pointer.x, pointer.y)
@@ -69,8 +60,24 @@ export class WorldPointerInput implements InputProvider {
       return;
     }
 
-    this.pointerWorld = this.toWorldPointer(pointer);
-    this.selectPressed = true;
+    const world = this.toWorldPointer(pointer);
+    this.pointerWorld = world;
+
+    const now = this.scene.time.now;
+    if (
+      this.lastTapWorld &&
+      now - this.lastTapTime <= DOUBLE_TAP_WINDOW_MS &&
+      Math.hypot(world.worldX - this.lastTapWorld.worldX, world.worldY - this.lastTapWorld.worldY) <=
+        DOUBLE_TAP_MAX_DISTANCE
+    ) {
+      this.doubleSelectPressed = true;
+      this.lastTapTime = 0;
+      this.lastTapWorld = null;
+      return;
+    }
+
+    this.lastTapTime = now;
+    this.lastTapWorld = world;
   }
 
   private toWorldPointer(pointer: Phaser.Input.Pointer): { worldX: number; worldY: number } {

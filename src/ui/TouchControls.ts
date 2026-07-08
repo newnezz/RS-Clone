@@ -2,6 +2,13 @@ import Phaser from 'phaser';
 import { createInputState, type InputState } from '../game/input/types';
 import type { InputProvider } from '../game/input/InputProvider';
 import type { DeviceProfile } from '../game/platform/DeviceProfile';
+import {
+  getHudMargin,
+  getSafeAreaInsets,
+  getTotalBottomInset,
+  isLandscapePhone,
+  onUiLayoutChange,
+} from './UiLayout';
 
 const DEAD_ZONE = 0.15;
 
@@ -18,6 +25,7 @@ export class TouchControls implements InputProvider {
   private baseSize = 120;
   private knobSize = 48;
   private maxRadius = 36;
+  private readonly removeLayoutListener: () => void;
 
   constructor(scene: Phaser.Scene, deviceProfile: DeviceProfile) {
     this.scene = scene;
@@ -36,6 +44,7 @@ export class TouchControls implements InputProvider {
       .setVisible(false);
 
     scene.scale.on(Phaser.Scale.Events.RESIZE, this.layout, this);
+    this.removeLayoutListener = onUiLayoutChange(() => this.layout());
     this.layout();
 
     scene.input.on('pointerdown', this.onPointerDown, this);
@@ -65,11 +74,22 @@ export class TouchControls implements InputProvider {
   }
 
   isInJoystickZone(screenX: number, screenY: number): boolean {
-    const halfScreen = this.scene.scale.width / 2;
-    return screenX <= halfScreen && screenY >= this.scene.scale.height * 0.3;
+    const safe = getSafeAreaInsets();
+    const bottomInset = getTotalBottomInset() + getHudMargin();
+    const leftBound = safe.left + getHudMargin() + this.baseSize + 12;
+    const topBound = this.scene.scale.height * 0.22;
+    const bottomBound = this.scene.scale.height - bottomInset + 8;
+
+    return (
+      screenX <= leftBound &&
+      screenX >= safe.left &&
+      screenY >= topBound &&
+      screenY <= bottomBound
+    );
   }
 
   destroy(): void {
+    this.removeLayoutListener();
     this.scene.scale.off(Phaser.Scale.Events.RESIZE, this.layout, this);
     this.scene.input.off('pointerdown', this.onPointerDown, this);
     this.scene.input.off('pointermove', this.onPointerMove, this);
@@ -81,17 +101,20 @@ export class TouchControls implements InputProvider {
 
   private layout(): void {
     const minDimension = Math.min(this.scene.scale.width, this.scene.scale.height);
-    this.baseSize = Math.max(104, Math.min(148, minDimension * 0.24));
+    const scaleFactor = isLandscapePhone() ? 0.18 : 0.22;
+    this.baseSize = Math.max(88, Math.min(128, minDimension * scaleFactor));
     this.knobSize = this.baseSize * 0.4;
     this.maxRadius = this.baseSize / 2 - this.knobSize / 2;
 
     this.base.setRadius(this.baseSize / 2);
     this.knob.setRadius(this.knobSize / 2);
 
-    const margin = 20 + this.deviceProfile.safeAreaInsets.bottom;
-    const sideInset = 20 + this.deviceProfile.safeAreaInsets.left;
+    const safe = getSafeAreaInsets();
+    const margin = getHudMargin();
+    const bottomInset = getTotalBottomInset() + margin;
+    const sideInset = margin + safe.left;
     const x = sideInset + this.baseSize / 2;
-    const y = this.scene.scale.height - margin - this.baseSize / 2;
+    const y = this.scene.scale.height - bottomInset - this.baseSize / 2 - 4;
 
     this.base.setPosition(x, y);
 
