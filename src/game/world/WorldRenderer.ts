@@ -11,17 +11,17 @@ function isGatherableObject(object: string | null): boolean {
   return object === ObjectType.Tree || object === ObjectType.Rock;
 }
 
+function getTerrainTextureKey(terrain: TerrainType, tileX: number, tileY: number): string {
+  if (terrain === TerrainType.Grass && (tileX + tileY) % 2 === 1) {
+    return 'terrain_grass_alt';
+  }
+  return TERRAIN_TEXTURE[terrain];
+}
+
 export class WorldRenderer {
   constructor(scene: Phaser.Scene, map: WorldMap) {
-    const worldWidth = map.width * TILE_SIZE;
-    const worldHeight = map.height * TILE_SIZE;
-
-    this.bakeTerrain(scene, map, worldWidth, worldHeight);
-    this.bakeStaticObjects(scene, map, worldWidth, worldHeight);
-  }
-
-  private bakeTerrain(scene: Phaser.Scene, map: WorldMap, worldWidth: number, worldHeight: number): void {
-    const renderTexture = scene.add.renderTexture(0, 0, worldWidth, worldHeight).setOrigin(0, 0);
+    const floorLayer = scene.add.layer().setDepth(0);
+    const wallLayer = scene.add.layer().setDepth(1);
 
     for (let tileY = 0; tileY < map.height; tileY++) {
       for (let tileX = 0; tileX < map.width; tileX++) {
@@ -30,27 +30,12 @@ export class WorldRenderer {
           continue;
         }
 
-        const textureKey =
-          terrain === TerrainType.Grass && (tileX + tileY) % 2 === 1
-            ? 'terrain_grass_alt'
-            : TERRAIN_TEXTURE[terrain];
-
-        renderTexture.draw(textureKey, tileX * TILE_SIZE, tileY * TILE_SIZE);
+        const tile = scene.add
+          .image(tileX * TILE_SIZE, tileY * TILE_SIZE, getTerrainTextureKey(terrain, tileX, tileY))
+          .setOrigin(0, 0);
+        floorLayer.add(tile);
       }
     }
-
-    renderTexture.saveTexture('world_terrain');
-    renderTexture.destroy();
-    scene.add.image(0, 0, 'world_terrain').setOrigin(0, 0).setDepth(0);
-  }
-
-  private bakeStaticObjects(
-    scene: Phaser.Scene,
-    map: WorldMap,
-    worldWidth: number,
-    worldHeight: number,
-  ): Phaser.GameObjects.Image {
-    const renderTexture = scene.add.renderTexture(0, 0, worldWidth, worldHeight).setOrigin(0, 0);
 
     for (let tileY = 0; tileY < map.height; tileY++) {
       for (let tileX = 0; tileX < map.width; tileX++) {
@@ -64,13 +49,12 @@ export class WorldRenderer {
           continue;
         }
 
-        renderTexture.draw(textureKey, tileX * TILE_SIZE, tileY * TILE_SIZE);
+        const wall = scene.add
+          .image(tileX * TILE_SIZE, tileY * TILE_SIZE, textureKey)
+          .setOrigin(0, 0);
+        wallLayer.add(wall);
       }
     }
-
-    renderTexture.saveTexture('world_static_objects');
-    renderTexture.destroy();
-    return scene.add.image(0, 0, 'world_static_objects').setOrigin(0, 0).setDepth(2);
   }
 }
 

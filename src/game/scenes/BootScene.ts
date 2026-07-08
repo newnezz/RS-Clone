@@ -25,39 +25,29 @@ function createTileCanvas(draw: (ctx: CanvasRenderingContext2D) => void): HTMLCa
 }
 
 function grassTile(ctx: CanvasRenderingContext2D): void {
-  ctx.fillStyle = '#5a9a48';
+  ctx.fillStyle = '#8ecf6a';
   ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
 
-  ctx.fillStyle = '#4a8540';
-  ctx.fillRect(2, 2, TILE_SIZE - 4, TILE_SIZE - 4);
+  ctx.strokeStyle = '#2f5f28';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, TILE_SIZE - 2, TILE_SIZE - 2);
 
-  ctx.strokeStyle = '#3d6f34';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(0.5, 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
-
-  ctx.fillStyle = '#6aad58';
-  for (let i = 0; i < 4; i++) {
-    ctx.fillRect(6 + i * 6, 8 + (i % 2) * 4, 2, 2);
-    ctx.fillRect(10 + i * 5, 20 - (i % 2) * 3, 2, 2);
-  }
+  ctx.fillStyle = '#9adb78';
+  ctx.fillRect(4, 4, 8, 8);
+  ctx.fillRect(18, 18, 8, 8);
 }
 
 function grassAltTile(ctx: CanvasRenderingContext2D): void {
-  ctx.fillStyle = '#4f8f42';
+  ctx.fillStyle = '#3f7a34';
   ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
 
-  ctx.fillStyle = '#3f7840';
-  ctx.fillRect(2, 2, TILE_SIZE - 4, TILE_SIZE - 4);
+  ctx.strokeStyle = '#1f3f18';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, TILE_SIZE - 2, TILE_SIZE - 2);
 
-  ctx.strokeStyle = '#325f2c';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(0.5, 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
-
-  ctx.fillStyle = '#5a9a50';
-  for (let i = 0; i < 4; i++) {
-    ctx.fillRect(8 + i * 5, 6 + (i % 2) * 5, 2, 2);
-    ctx.fillRect(5 + i * 6, 18 + (i % 2) * 4, 2, 2);
-  }
+  ctx.fillStyle = '#4f8f44';
+  ctx.fillRect(18, 4, 8, 8);
+  ctx.fillRect(4, 18, 8, 8);
 }
 
 function waterTile(ctx: CanvasRenderingContext2D): void {
@@ -109,10 +99,10 @@ function rockTile(ctx: CanvasRenderingContext2D): void {
 }
 
 function villageWallTile(ctx: CanvasRenderingContext2D): void {
-  ctx.fillStyle = '#4a4a4a';
+  ctx.fillStyle = '#2b2b2b';
   ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
 
-  ctx.fillStyle = '#5c5c5c';
+  ctx.fillStyle = '#6a6a6a';
   for (let row = 0; row < 4; row++) {
     for (let col = 0; col < 4; col++) {
       const offset = row % 2 === 0 ? 0 : 4;
@@ -122,7 +112,7 @@ function villageWallTile(ctx: CanvasRenderingContext2D): void {
     }
   }
 
-  ctx.strokeStyle = '#2a2a2a';
+  ctx.strokeStyle = '#111111';
   ctx.lineWidth = 1;
   for (let row = 0; row <= 4; row++) {
     ctx.beginPath();
@@ -137,10 +127,11 @@ function villageWallTile(ctx: CanvasRenderingContext2D): void {
     ctx.stroke();
   }
 
-  ctx.fillStyle = '#7a7a7a';
-  ctx.fillRect(0, 0, TILE_SIZE, 4);
-  ctx.fillStyle = '#1a1a1a';
-  ctx.fillRect(0, TILE_SIZE - 3, TILE_SIZE, 3);
+  ctx.fillStyle = '#b0b0b0';
+  ctx.fillRect(0, 0, TILE_SIZE, 5);
+  ctx.fillStyle = '#000000';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(1.5, 1.5, TILE_SIZE - 3, TILE_SIZE - 3);
 }
 
 function villageHouseTile(ctx: CanvasRenderingContext2D): void {

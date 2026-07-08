@@ -52,7 +52,7 @@ export function createDeviceProfile(): DeviceProfile {
     inputMode,
     isTouchPrimary,
     isLowEnd,
-    cameraZoom: isLowEnd ? 1.5 : isTouchPrimary ? 1.75 : 2,
+    cameraZoom: isLowEnd ? 1.25 : isTouchPrimary ? 1.5 : 1.75,
     targetFps: isLowEnd ? 30 : 60,
     preferLowPowerGpu: isLowEnd || isTouchPrimary,
     safeAreaInsets: {
