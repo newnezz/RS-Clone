@@ -2,13 +2,6 @@ import type { PlayerSession } from '../auth/types';
 import type { ChatMessage } from '../network/types';
 import { initUiLayout } from './UiLayout';
 
-function isTouchDevice(): boolean {
-  return (
-    window.matchMedia('(pointer: coarse)').matches ||
-    (navigator.maxTouchPoints ?? 0) > 0
-  );
-}
-
 export class ChatPanel {
   private readonly root: HTMLElement;
   private readonly messagesEl: HTMLElement;
@@ -19,7 +12,7 @@ export class ChatPanel {
 
   constructor(session: PlayerSession, onSend: (text: string) => Promise<{ error: string | null }>) {
     this.onSend = onSend;
-    this.open = !isTouchDevice();
+    this.open = true;
 
     const element = document.getElementById('chat-root');
     if (!element) {
@@ -27,16 +20,18 @@ export class ChatPanel {
     }
     this.root = element;
 
+    const offlineHint = session.mode === 'offline' ? ' (offline — local only)' : '';
+
     this.root.innerHTML = `
-      <div class="chat-panel ${session.mode === 'offline' ? 'chat-disabled' : ''} ${this.open ? '' : 'chat-collapsed'}">
+      <div class="chat-panel ${this.open ? '' : 'chat-collapsed'}">
         <div class="chat-header">
           <span>World Chat</span>
           <button type="button" id="chat-toggle" aria-label="Toggle chat">${this.open ? '−' : '+'}</button>
         </div>
         <div id="chat-messages" class="chat-messages"></div>
         <form id="chat-form" class="chat-form">
-          <input id="chat-input" type="text" maxlength="200" placeholder="${session.mode === 'offline' ? 'Chat requires online login' : 'Type a message…'}" ${session.mode === 'offline' ? 'disabled' : ''} />
-          <button type="submit" ${session.mode === 'offline' ? 'disabled' : ''}>Send</button>
+          <input id="chat-input" type="text" maxlength="200" placeholder="Type a message…${offlineHint}" autocomplete="off" enterkeyhint="send" />
+          <button type="submit">Send</button>
         </form>
       </div>
     `;
@@ -72,6 +67,8 @@ export class ChatPanel {
 
     if (session.mode === 'online') {
       this.addSystemMessage(`Logged in as ${session.username}. Say hello!`);
+    } else {
+      this.addSystemMessage(`Playing offline as ${session.username}. Chat is local only.`);
     }
   }
 

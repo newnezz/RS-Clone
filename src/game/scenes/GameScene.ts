@@ -3,33 +3,23 @@ import { AuthService } from '../../auth/AuthService';
 import type { PlayerSession } from '../../auth/types';
 import { GameContext } from '../core/GameContext';
 import { EntityManager } from '../entities/EntityManager';
-// import { createNpc } from '../entities/NpcFactory';
 import { createPlayer } from '../entities/PlayerFactory';
-// import { GATHERING_BY_OBJECT } from '../gathering/types';
-// import { buildResourceNodeRegistry } from '../gathering/ResourceNodes';
 import { InteractableRegistry } from '../interaction/InteractableRegistry';
 import { InputManager } from '../input/InputManager';
 import { createInputState } from '../input/types';
-// import { NPC_DEFINITIONS } from '../npcs/npcData';
 import { NpcRegistry } from '../npcs/NpcRegistry';
-// import { spawnNpcs } from '../npcs/NpcRegistry';
 import type { DeviceProfile } from '../platform/DeviceProfile';
 import { createGameState } from '../state/GameState';
 import { GameWorld } from '../systems/GameWorld';
 import { WORLD_HEIGHT, WORLD_WIDTH } from '../constants';
-// import { GatherableVisuals } from '../world/GatherableVisuals';
 import { WorldMap } from '../world/WorldMap';
 import { WorldRenderer } from '../world/WorldRenderer';
 import { DEFAULT_SPAWN, generateWorldData } from '../world/mapData';
-// import { ObjectType } from '../world/TileTypes';
 import { RealtimeService } from '../../network/RealtimeService';
 import { RemotePlayerManager } from '../../network/RemotePlayerManager';
 import { PRESENCE_SYNC_INTERVAL_MS } from '../../network/types';
-import { KeyboardInput } from '../../ui/KeyboardInput';
-import { TouchControls } from '../../ui/TouchControls';
-// import { WorldPointerInput } from '../../ui/WorldPointerInput';
+import { WorldPointerInput } from '../../ui/WorldPointerInput';
 import { ChatPanel } from '../../ui/ChatPanel';
-// import { GatheringProgressBar } from '../../ui/GatheringProgressBar';
 import { Hud } from '../../ui/Hud';
 import { initUiLayout } from '../../ui/UiLayout';
 import { ResourceNodeRegistry } from '../gathering/ResourceNodes';
@@ -38,11 +28,7 @@ export class GameScene extends Phaser.Scene {
   private gameWorld!: GameWorld;
   private inputManager!: InputManager;
   private hud!: Hud;
-  // private inventoryPanel!: InventoryPanel;
-  private touchControls!: TouchControls;
-  // private worldPointerInput!: WorldPointerInput;
-  // private gatheringProgressBar!: GatheringProgressBar;
-  // private gatherableVisuals!: GatherableVisuals;
+  private worldPointerInput!: WorldPointerInput;
   private session!: PlayerSession;
   private realtime: RealtimeService | null = null;
   private remotePlayers: RemotePlayerManager | null = null;
@@ -65,7 +51,6 @@ export class GameScene extends Phaser.Scene {
     const npcs = new NpcRegistry();
 
     new WorldRenderer(this, map);
-    // this.gatherableVisuals = new GatherableVisuals(this, map);
 
     const entityManager = new EntityManager();
     const player = createPlayer(entityManager, DEFAULT_SPAWN.x, DEFAULT_SPAWN.y);
@@ -98,23 +83,25 @@ export class GameScene extends Phaser.Scene {
 
     initUiLayout();
 
-    this.touchControls = new TouchControls(this, deviceProfile);
-    // this.worldPointerInput = new WorldPointerInput(this, deviceProfile, this.touchControls);
+    this.worldPointerInput = new WorldPointerInput(this);
+    this.inputManager = new InputManager([this.worldPointerInput]);
 
-    const keyboardInput = new KeyboardInput(this);
-    this.inputManager = new InputManager([
-      this.touchControls,
-      // this.worldPointerInput,
-      keyboardInput,
-    ]);
-
-    // this.gatheringProgressBar = new GatheringProgressBar(this);
     this.hud = new Hud(this, deviceProfile, this.session, () => {
       void this.handleSignOut();
     });
-    // this.inventoryPanel = new InventoryPanel(this, deviceProfile);
 
     this.chatPanel = new ChatPanel(this.session, async (text) => {
+      if (this.session.mode === 'offline') {
+        this.chatPanel?.addMessage({
+          id: crypto.randomUUID(),
+          userId: this.session.userId,
+          username: this.session.username,
+          text: text.trim(),
+          timestamp: Date.now(),
+        });
+        return { error: null };
+      }
+
       if (!this.realtime) {
         return { error: 'Chat unavailable.' };
       }
@@ -135,9 +122,7 @@ export class GameScene extends Phaser.Scene {
   update(time: number, delta: number): void {
     this.gameWorld.context.inputState = this.inputManager.poll();
     this.gameWorld.update(delta);
-    // this.gatheringProgressBar.update(this.gameWorld.context);
     this.hud.update(this.gameWorld.context);
-    // this.inventoryPanel.update(this.gameWorld.context);
 
     const position = this.gameWorld.context.getPlayerPosition();
     if (position && this.localPlayerLabel) {
@@ -191,12 +176,8 @@ export class GameScene extends Phaser.Scene {
   private cleanup(): void {
     void this.realtime?.disconnect();
     this.gameWorld.destroy();
-    this.touchControls.destroy();
-    // this.worldPointerInput.destroy();
-    // this.gatheringProgressBar.destroy();
-    // this.gatherableVisuals.destroy();
+    this.worldPointerInput.destroy();
     this.hud.destroy();
-    // this.inventoryPanel.destroy();
     this.localPlayerLabel?.destroy();
     this.remotePlayers?.destroy();
     this.chatPanel?.destroy();

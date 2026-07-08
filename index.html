@@ -227,13 +227,14 @@
         bottom: var(--safe-area-bottom);
         z-index: 9000;
         pointer-events: none;
-        touch-action: auto;
+        touch-action: manipulation;
         -webkit-user-select: text;
         user-select: text;
       }
 
       .chat-panel {
         pointer-events: auto;
+        touch-action: manipulation;
         margin: 0 0 8px 10px;
         max-width: min(320px, 58vw);
         background: rgba(0, 0, 0, 0.82);
@@ -313,6 +314,7 @@
         border-radius: 8px;
         background: #1a1a1a;
         color: white;
+        touch-action: manipulation;
       }
 
       .chat-form button {

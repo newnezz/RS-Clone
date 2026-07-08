@@ -23,6 +23,7 @@ export class GameContext {
   readonly interactionState: InteractionState;
   gatherableVisuals: GatherableVisualAdapter | null;
   inputState: InputState;
+  moveDestination: { x: number; y: number } | null;
 
   constructor(options: {
     entityManager: EntityManager;
@@ -47,6 +48,7 @@ export class GameContext {
     this.interactionState = createInteractionState();
     this.gatherableVisuals = options.gatherableVisuals ?? null;
     this.inputState = options.inputState;
+    this.moveDestination = null;
   }
 
   getPlayerPosition(): { x: number; y: number } | null {

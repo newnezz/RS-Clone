@@ -59,10 +59,6 @@ export class Hud {
       .setScrollFactor(0)
       .setDepth(2000);
 
-    if (this.deviceProfile.isTouchPrimary) {
-      this.helpText.setVisible(false);
-    }
-
     scene.scale.on(Phaser.Scale.Events.RESIZE, this.layout, this);
     this.removeLayoutListener = onUiLayoutChange(this.layout);
     this.layout();
@@ -86,11 +82,7 @@ export class Hud {
   }
 
   private getHelpText(): string {
-    if (this.deviceProfile.inputMode === 'touch') {
-      return 'Move with joystick · Chat below';
-    }
-
-    return 'WASD / arrows to move · Chat below';
+    return 'Click or tap the map to move · Chat below';
   }
 
   private layout = (): void => {
@@ -113,9 +105,7 @@ export class Hud {
 
     setHudBottomY(Math.max(y, top + getTopChromeHeight()));
 
-    if (!this.deviceProfile.isTouchPrimary) {
-      this.helpText.setPosition(left, screenHeight - bottomInset - this.helpText.height);
-    }
+    this.helpText.setPosition(left, screenHeight - bottomInset - this.helpText.height);
   };
 
   private get scene(): Phaser.Scene {

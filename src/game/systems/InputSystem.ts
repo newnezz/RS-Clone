@@ -2,7 +2,6 @@ import type { GameContext } from '../core/GameContext';
 import { GameEvents } from '../core/EventBus';
 import { APPROACH_ARRIVAL_DISTANCE, PLAYER_SPEED } from '../constants';
 import { normalizeInputVector } from '../input/types';
-import { hasManualMovement } from '../interaction/interactionUtils';
 import type { GameSystem } from './SystemPipeline';
 
 export class InputSystem implements GameSystem {
@@ -15,36 +14,25 @@ export class InputSystem implements GameSystem {
     }
 
     const velocity = player.components.velocity;
-    const interaction = context.interactionState;
 
-    if (interaction.gathering) {
-      velocity.vx = 0;
-      velocity.vy = 0;
-      return;
+    if (context.inputState.selectPressed && context.inputState.pointer) {
+      context.moveDestination = {
+        x: context.inputState.pointer.worldX,
+        y: context.inputState.pointer.worldY,
+      };
     }
 
-    if (hasManualMovement(context.inputState.movement)) {
-      const direction = normalizeInputVector(context.inputState.movement);
-      velocity.vx = direction.x * PLAYER_SPEED;
-      velocity.vy = direction.y * PLAYER_SPEED;
-      return;
-    }
-
-    if (interaction.approachTile && interaction.selectedTarget) {
+    if (context.moveDestination) {
       const playerPosition = context.getPlayerPosition();
       if (playerPosition) {
-        const target = context.map.tileToWorldCenter(
-          interaction.approachTile.tileX,
-          interaction.approachTile.tileY,
-        );
-        const dx = target.x - playerPosition.x;
-        const dy = target.y - playerPosition.y;
+        const dx = context.moveDestination.x - playerPosition.x;
+        const dy = context.moveDestination.y - playerPosition.y;
         const distance = Math.hypot(dx, dy);
 
         if (distance <= APPROACH_ARRIVAL_DISTANCE) {
           velocity.vx = 0;
           velocity.vy = 0;
-          interaction.approachTile = null;
+          context.moveDestination = null;
           return;
         }
 
@@ -55,9 +43,8 @@ export class InputSystem implements GameSystem {
       }
     }
 
-    const direction = normalizeInputVector(context.inputState.movement);
-    velocity.vx = direction.x * PLAYER_SPEED;
-    velocity.vy = direction.y * PLAYER_SPEED;
+    velocity.vx = 0;
+    velocity.vy = 0;
   }
 }
 
