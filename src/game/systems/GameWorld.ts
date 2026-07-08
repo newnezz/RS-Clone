@@ -1,6 +1,6 @@
 import type Phaser from 'phaser';
 import type { GameContext } from '../core/GameContext';
-import { GatheringSystem, InteractionSystem } from './GatheringSystem';
+// import { GatheringSystem, InteractionSystem } from './GatheringSystem';
 import { CameraSystem } from './CameraSystem';
 import { InputSystem, MovementSystem } from './InputSystem';
 import { RenderSystem } from './RenderSystem';
@@ -16,10 +16,10 @@ export class GameWorld {
     this.renderSystem = new RenderSystem(scene);
 
     this.pipeline = new SystemPipeline()
-      .add(new InteractionSystem())
+      // .add(new InteractionSystem())
       .add(new InputSystem())
       .add(new MovementSystem())
-      .add(new GatheringSystem())
+      // .add(new GatheringSystem())
       .add(this.renderSystem)
       .add(new CameraSystem(scene, context.deviceProfile.cameraZoom));
   }

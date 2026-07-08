@@ -3,48 +3,51 @@ import { AuthService } from '../../auth/AuthService';
 import type { PlayerSession } from '../../auth/types';
 import { GameContext } from '../core/GameContext';
 import { EntityManager } from '../entities/EntityManager';
-import { createNpc } from '../entities/NpcFactory';
+// import { createNpc } from '../entities/NpcFactory';
 import { createPlayer } from '../entities/PlayerFactory';
-import { GATHERING_BY_OBJECT } from '../gathering/types';
-import { buildResourceNodeRegistry } from '../gathering/ResourceNodes';
-import { buildInteractableRegistry } from '../interaction/InteractableRegistry';
+// import { GATHERING_BY_OBJECT } from '../gathering/types';
+// import { buildResourceNodeRegistry } from '../gathering/ResourceNodes';
+import { InteractableRegistry } from '../interaction/InteractableRegistry';
 import { InputManager } from '../input/InputManager';
 import { createInputState } from '../input/types';
-import { NPC_DEFINITIONS } from '../npcs/npcData';
-import { spawnNpcs } from '../npcs/NpcRegistry';
+// import { NPC_DEFINITIONS } from '../npcs/npcData';
+import { NpcRegistry } from '../npcs/NpcRegistry';
+// import { spawnNpcs } from '../npcs/NpcRegistry';
 import type { DeviceProfile } from '../platform/DeviceProfile';
 import { createGameState } from '../state/GameState';
 import { GameWorld } from '../systems/GameWorld';
 import { WORLD_HEIGHT, WORLD_WIDTH } from '../constants';
-import { GatherableVisuals } from '../world/GatherableVisuals';
+// import { GatherableVisuals } from '../world/GatherableVisuals';
 import { WorldMap } from '../world/WorldMap';
 import { WorldRenderer } from '../world/WorldRenderer';
 import { DEFAULT_SPAWN, generateWorldData } from '../world/mapData';
-import { ObjectType } from '../world/TileTypes';
+// import { ObjectType } from '../world/TileTypes';
 import { RealtimeService } from '../../network/RealtimeService';
 import { RemotePlayerManager } from '../../network/RemotePlayerManager';
 import { PRESENCE_SYNC_INTERVAL_MS } from '../../network/types';
 import { KeyboardInput } from '../../ui/KeyboardInput';
 import { TouchControls } from '../../ui/TouchControls';
-import { WorldPointerInput } from '../../ui/WorldPointerInput';
+// import { WorldPointerInput } from '../../ui/WorldPointerInput';
 import { ChatPanel } from '../../ui/ChatPanel';
-import { GatheringProgressBar } from '../../ui/GatheringProgressBar';
-import { Hud, InventoryPanel } from '../../ui/Hud';
+// import { GatheringProgressBar } from '../../ui/GatheringProgressBar';
+import { Hud } from '../../ui/Hud';
 import { initUiLayout } from '../../ui/UiLayout';
+import { ResourceNodeRegistry } from '../gathering/ResourceNodes';
 
 export class GameScene extends Phaser.Scene {
   private gameWorld!: GameWorld;
   private inputManager!: InputManager;
   private hud!: Hud;
-  private inventoryPanel!: InventoryPanel;
+  // private inventoryPanel!: InventoryPanel;
   private touchControls!: TouchControls;
-  private worldPointerInput!: WorldPointerInput;
-  private gatheringProgressBar!: GatheringProgressBar;
-  private gatherableVisuals!: GatherableVisuals;
+  // private worldPointerInput!: WorldPointerInput;
+  // private gatheringProgressBar!: GatheringProgressBar;
+  // private gatherableVisuals!: GatherableVisuals;
   private session!: PlayerSession;
   private realtime: RealtimeService | null = null;
   private remotePlayers: RemotePlayerManager | null = null;
   private chatPanel: ChatPanel | null = null;
+  private localPlayerLabel: Phaser.GameObjects.Text | null = null;
   private lastPresenceSync = 0;
 
   constructor() {
@@ -57,19 +60,27 @@ export class GameScene extends Phaser.Scene {
 
     const { terrain, objects } = generateWorldData();
     const map = new WorldMap(WORLD_WIDTH, WORLD_HEIGHT, terrain, objects);
-    const interactables = buildInteractableRegistry(map);
-    const resourceNodes = buildResourceNodeRegistry(map, {
-      [ObjectType.Tree]: GATHERING_BY_OBJECT[ObjectType.Tree]!.hitsToDeplete,
-      [ObjectType.Rock]: GATHERING_BY_OBJECT[ObjectType.Rock]!.hitsToDeplete,
-    });
+    const interactables = new InteractableRegistry();
+    const resourceNodes = new ResourceNodeRegistry();
+    const npcs = new NpcRegistry();
 
     new WorldRenderer(this, map);
-    this.gatherableVisuals = new GatherableVisuals(this, map);
+    // this.gatherableVisuals = new GatherableVisuals(this, map);
 
     const entityManager = new EntityManager();
     const player = createPlayer(entityManager, DEFAULT_SPAWN.x, DEFAULT_SPAWN.y);
-    const npcs = spawnNpcs(entityManager, NPC_DEFINITIONS, createNpc);
     const gameState = createGameState(player.id);
+
+    this.localPlayerLabel = this.add
+      .text(DEFAULT_SPAWN.x, DEFAULT_SPAWN.y - 22, this.session.username, {
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        color: '#ffffff',
+        backgroundColor: '#000000aa',
+        padding: { x: 4, y: 2 },
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(11);
 
     const context = new GameContext({
       entityManager,
@@ -80,7 +91,7 @@ export class GameScene extends Phaser.Scene {
       gameState,
       deviceProfile,
       inputState: createInputState(),
-      gatherableVisuals: this.gatherableVisuals,
+      gatherableVisuals: null,
     });
 
     this.gameWorld = new GameWorld(context, this);
@@ -88,20 +99,20 @@ export class GameScene extends Phaser.Scene {
     initUiLayout();
 
     this.touchControls = new TouchControls(this, deviceProfile);
-    this.worldPointerInput = new WorldPointerInput(this, deviceProfile, this.touchControls);
+    // this.worldPointerInput = new WorldPointerInput(this, deviceProfile, this.touchControls);
 
     const keyboardInput = new KeyboardInput(this);
     this.inputManager = new InputManager([
       this.touchControls,
-      this.worldPointerInput,
+      // this.worldPointerInput,
       keyboardInput,
     ]);
 
-    this.gatheringProgressBar = new GatheringProgressBar(this);
+    // this.gatheringProgressBar = new GatheringProgressBar(this);
     this.hud = new Hud(this, deviceProfile, this.session, () => {
       void this.handleSignOut();
     });
-    this.inventoryPanel = new InventoryPanel(this, deviceProfile);
+    // this.inventoryPanel = new InventoryPanel(this, deviceProfile);
 
     this.chatPanel = new ChatPanel(this.session, async (text) => {
       if (!this.realtime) {
@@ -124,13 +135,17 @@ export class GameScene extends Phaser.Scene {
   update(time: number, delta: number): void {
     this.gameWorld.context.inputState = this.inputManager.poll();
     this.gameWorld.update(delta);
-    this.gatheringProgressBar.update(this.gameWorld.context);
+    // this.gatheringProgressBar.update(this.gameWorld.context);
     this.hud.update(this.gameWorld.context);
-    this.inventoryPanel.update(this.gameWorld.context);
+    // this.inventoryPanel.update(this.gameWorld.context);
+
+    const position = this.gameWorld.context.getPlayerPosition();
+    if (position && this.localPlayerLabel) {
+      this.localPlayerLabel.setPosition(position.x, position.y - 22);
+    }
 
     if (this.realtime?.isConnected && this.remotePlayers) {
       if (time - this.lastPresenceSync >= PRESENCE_SYNC_INTERVAL_MS) {
-        const position = this.gameWorld.context.getPlayerPosition();
         if (position) {
           void this.realtime.updatePresence(position.x, position.y);
         }
@@ -177,11 +192,12 @@ export class GameScene extends Phaser.Scene {
     void this.realtime?.disconnect();
     this.gameWorld.destroy();
     this.touchControls.destroy();
-    this.worldPointerInput.destroy();
-    this.gatheringProgressBar.destroy();
-    this.gatherableVisuals.destroy();
+    // this.worldPointerInput.destroy();
+    // this.gatheringProgressBar.destroy();
+    // this.gatherableVisuals.destroy();
     this.hud.destroy();
-    this.inventoryPanel.destroy();
+    // this.inventoryPanel.destroy();
+    this.localPlayerLabel?.destroy();
     this.remotePlayers?.destroy();
     this.chatPanel?.destroy();
   }
