@@ -14,7 +14,7 @@ import { GameWorld } from '../systems/GameWorld';
 import { WORLD_HEIGHT, WORLD_WIDTH } from '../constants';
 import { WorldMap } from '../world/WorldMap';
 import { WorldRenderer } from '../world/WorldRenderer';
-import { DEFAULT_SPAWN, generateWorldData } from '../world/mapData';
+import { DEFAULT_SPAWN, generateWorldData, getSpawnPosition } from '../world/mapData';
 import { RealtimeService } from '../../network/RealtimeService';
 import { RemotePlayerManager } from '../../network/RemotePlayerManager';
 import { PRESENCE_SYNC_INTERVAL_MS } from '../../network/types';
@@ -35,6 +35,7 @@ export class GameScene extends Phaser.Scene {
   private chatPanel: ChatPanel | null = null;
   private localPlayerLabel: Phaser.GameObjects.Text | null = null;
   private lastPresenceSync = 0;
+  private lastRemotePlayerCount = 0;
 
   constructor() {
     super('GameScene');
@@ -53,11 +54,14 @@ export class GameScene extends Phaser.Scene {
     new WorldRenderer(this, map);
 
     const entityManager = new EntityManager();
-    const player = createPlayer(entityManager, DEFAULT_SPAWN.x, DEFAULT_SPAWN.y);
+    const spawn = this.session.mode === 'online'
+      ? getSpawnPosition(this.session.userId)
+      : DEFAULT_SPAWN;
+    const player = createPlayer(entityManager, spawn.x, spawn.y);
     const gameState = createGameState(player.id);
 
     this.localPlayerLabel = this.add
-      .text(DEFAULT_SPAWN.x, DEFAULT_SPAWN.y - 22, this.session.username, {
+      .text(spawn.x, spawn.y - 22, this.session.username, {
         fontFamily: 'monospace',
         fontSize: '11px',
         color: '#ffffff',
@@ -150,6 +154,13 @@ export class GameScene extends Phaser.Scene {
 
     this.realtime.onPresence((players) => {
       this.remotePlayers?.syncPresence(players);
+      if (players.length !== this.lastRemotePlayerCount) {
+        this.lastRemotePlayerCount = players.length;
+        if (players.length > 0) {
+          const names = players.map((player) => player.username).join(', ');
+          this.chatPanel?.addSystemMessage(`${players.length} other player(s) nearby: ${names}`);
+        }
+      }
     });
 
     this.realtime.onChat((message) => {
